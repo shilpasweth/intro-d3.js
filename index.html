@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <head>
 <meta charset="utf-8">
-<script src="https://d3js.org/d3.v5.min.js"></script>
+<script src="https://d3js.org/d3.v4.min.js"></script>
 <style>
 
 body {
@@ -41,186 +41,160 @@ body {
 
 <body>
 
-<font style="font-size:11px;">Change metric:</font>
+<font style="font-size:11px;">Change State:</font>
 <select id="selectbox">
-  <option value="_1">Fahrenheit</option>
-  <option value="_2">Celsius</option>
+  <option value="Alabama">Alabama</option>
+  <option value="Alaska">Alaska</option>
 </select>
 
-<svg id="chart" width="850" height="410"></svg>
+<svg id="chart" width="800" height="600"></svg>
 
-<script>
+<script>  
+  var margin = {top: 20, right: 20, bottom: 20, left: 50},
+  width = 700 - margin.left - margin.right,
+  height = 500 - margin.top - margin.bottom;  
 
-d3.csv("data.csv").then(d => chart(d))
-
-function chart(data) {
-
-  var keys = data.columns.slice(1);
-
-  var parseTime = d3.timeParse("%Y%m%d"),
-    formatDate = d3.timeFormat("%Y-%m-%d"),
-    bisectDate = d3.bisector(d => d.date).left,
-    formatValue = d3.format(",.0f");
-
-  data.forEach(function(d) {
-    d.date = parseTime(d.date);
-    return d;
-  })
-
-  var svg = d3.select("#chart"),
-    margin = {top: 15, right: 35, bottom: 15, left: 35},
-    width = +svg.attr("width") - margin.left - margin.right,
-    height = +svg.attr("height") - margin.top - margin.bottom;
-
-  var x = d3.scaleTime()
-    .rangeRound([margin.left, width - margin.right])
-    .domain(d3.extent(data, d => d.date))
-
-  var y = d3.scaleLinear()
-    .rangeRound([height - margin.bottom, margin.top]);
-
-  var z = d3.scaleOrdinal(d3.schemeCategory10);
-
-  var line = d3.line()
-    .curve(d3.curveCardinal)
-    .x(d => x(d.date))
-    .y(d => y(d.degrees));
-
-  svg.append("g")
-    .attr("class","x-axis")
-    .attr("transform", "translate(0," + (height - margin.bottom) + ")")
-    .call(d3.axisBottom(x).tickFormat(d3.timeFormat("%b")));
-
-  svg.append("g")
-    .attr("class", "y-axis")
-    .attr("transform", "translate(" + margin.left + ",0)");
-
-  var focus = svg.append("g")
-    .attr("class", "focus")
-    .style("display", "none");
-
-  focus.append("line").attr("class", "lineHover")
-    .style("stroke", "#999")
-    .attr("stroke-width", 1)
-    .style("shape-rendering", "crispEdges")
-    .style("opacity", 0.5)
-    .attr("y1", -height)
-    .attr("y2",0);
-
-  focus.append("text").attr("class", "lineHoverDate")
-    .attr("text-anchor", "middle")
-    .attr("font-size", 12);
-
-  var overlay = svg.append("rect")
-    .attr("class", "overlay")
-    .attr("x", margin.left)
-    .attr("width", width - margin.right - margin.left)
-    .attr("height", height)
-
-  update(d3.select('#selectbox').property('value'), 0);
-
-  function update(input, speed) {
-
-    var copy = keys.filter(f => f.includes(input))
-
-    var cities = copy.map(function(id) {
-      return {
-        id: id,
-        values: data.map(d => {return {date: d.date, degrees: +d[id]}})
-      };
+  var yearly_people_count = {}
+  yearly_people_count["2012"] = 2013.98
+  yearly_people_count["2013"] = 2026.34
+  yearly_people_count["2014"] = 601.41
+  yearly_people_count["2015"] = 1990.24
+  yearly_people_count["2016"] = 1854.87
+  yearly_people_count["2017"] = 1859.14
+  yearly_people_count["2018"] = 1800.84
+  yearly_people_count["2019"] = 1801.01
+  yearly_people_count["2020"] = 1579.59
+  yearly_people_count["2021"] = 1635.43
+  
+  d3.csv("asec_groupededulevels.csv", function(error, data) {
+    // d3.csv("company.csv", function(error, data) {
+    if (error) throw error;
+    // nest our data
+    var data = data.filter(function(d) {
+       return d.STATE == "Alabama"; 
     });
 
-    y.domain([
-      d3.min(cities, d => d3.min(d.values, c => c.degrees)),
-      d3.max(cities, d => d3.max(d.values, c => c.degrees))
-    ]).nice();
-
-    svg.selectAll(".y-axis").transition()
-      .duration(speed)
-      .call(d3.axisLeft(y).tickSize(-width + margin.right + margin.left))
-
-    var city = svg.selectAll(".cities")
-      .data(cities);
-
-    city.exit().remove();
-
-    city.enter().insert("g", ".focus").append("path")
-      .attr("class", "line cities")
-      .style("stroke", d => z(d.id))
-      .merge(city)
-    .transition().duration(speed)
-      .attr("d", d => line(d.values))
-
-    tooltip(copy);
-  }
-
-  function tooltip(copy) {
+    var dataGroup = d3.nest()
+    .key(function(d) {return d.EDU_LEVEL;})
+    .key(function(d) {return d.YEAR;})
+    .rollup (function(v) { return {
+       EDU_LEVEL_COUNT: d3.sum(v, function(d) {return d.EDU_LEVEL_COUNT; })
+     }; })
+    .entries(data);
     
-    var labels = focus.selectAll(".lineHoverText")
-      .data(copy)
 
-    labels.enter().append("text")
-      .attr("class", "lineHoverText")
-      .style("fill", d => z(d))
-      .attr("text-anchor", "start")
-      .attr("font-size",12)
-      .attr("dy", (_, i) => 1 + i * 2 + "em")
-      .merge(labels);
+    var svg = d3.select("#chart")
+    .append("svg")
+      // .attr("width", width + margin.left + margin.right)
+      // .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+      .attr("transform",
+            "translate(" + margin.left + "," + margin.top + ")");
 
-    var circles = focus.selectAll(".hoverCircle")
-      .data(copy)
+    var xScale = d3.scaleLinear()
+      .domain(d3.extent(data, function(d) { return d.YEAR; }))
+      .range([ 0, width ]);
+    svg.append("g")
+      .attr("transform", "translate(0," + height + ")")
+      .call(d3.axisBottom(xScale).ticks(10).tickFormat(d3.format("Y")));
 
-    circles.enter().append("circle")
-      .attr("class", "hoverCircle")
-      .style("fill", d => z(d))
-      .attr("r", 2.5)
-      .merge(circles);
+    // Add Y axis
+    var yScale = d3.scaleLinear()
+      // .domain([0, d3.max(data, function(d) { return +d.EDU_LEVEL_COUNT; })])
+      // .domain([0, 10*d3.max(data, function(d) { return +d.EDU_LEVEL_COUNT; })])
+      .domain([0, 30])
+      .range([ height, 0 ])
 
-    svg.selectAll(".overlay")
-      .on("mouseover", function() { focus.style("display", null); })
-      .on("mouseout", function() { focus.style("display", "none"); })
-      .on("mousemove", mousemove);
+    svg.append("g")
+      .call(d3.axisLeft(yScale)
+        .ticks(5)
+        .tickSizeInner(0)
+        .tickPadding(6)
+        .tickSize(0, 0)
+      )
 
-    function mousemove() {
+    
 
-      var x0 = x.invert(d3.mouse(this)[0]),
-        i = bisectDate(data, x0, 1),
-        d0 = data[i - 1],
-        d1 = data[i],
-        d = x0 - d0.date > d1.date - x0 ? d1 : d0;
 
-      focus.select(".lineHover")
-        .attr("transform", "translate(" + x(d.date) + "," + height + ")");
 
-      focus.select(".lineHoverDate")
-        .attr("transform", 
-          "translate(" + x(d.date) + "," + (height + margin.bottom) + ")")
-        .text(formatDate(d.date));
+    var lineGen = d3.line()
+      .x(function(d) {
+          return xScale(d.YEAR);
+      })
+      .y(function(d) {
+          return yScale(d.EDU_LEVEL_COUNT);
+      })
 
-      focus.selectAll(".hoverCircle")
-        .attr("cy", e => y(d[e]))
-        .attr("cx", x(d.date));
 
-      focus.selectAll(".lineHoverText")
-        .attr("transform", 
-          "translate(" + (x(d.date)) + "," + height / 2.5 + ")")
-        .text(e => e + " " + "º" + formatValue(d[e]));
 
-      x(d.date) > (width - width / 4) 
-        ? focus.selectAll("text.lineHoverText")
-          .attr("text-anchor", "end")
-          .attr("dx", -10)
-        : focus.selectAll("text.lineHoverText")
-          .attr("text-anchor", "start")
-          .attr("dx", 10)
-    }
-  }
 
-  var selectbox = d3.select("#selectbox")
-    .on("change", function() {
-      update(this.value, 750);
-    })
-}
+    var res = dataGroup.map(function(d){ return d.key }) // list of group names
+    var color = d3.scaleOrdinal()
+      .domain(res)
+      .range(["#b87a9c",
+        "#38af28",
+        "#b22bb2",
+        "#3ce09b",
+        "#a968f3",
+        "#fdba37",
+        "#014fbb",
+        "#be5100",
+        "#7e8aff",
+        "#d62426",
+        "#10c3ff",
+        "#de0064",
+        "#016e3e",
+        "#ff64ce",
+        "#585509",
+        "#464a99",
+        "#f8ba78",
+        "#8f2c61",
+        "#814118",
+        "#ff9f9b"])
+
+    svg.selectAll(".line")
+      .data(dataGroup)
+      .enter()
+      .append("path")
+        .attr("fill", "none")
+        .attr("stroke", function(d){ return color(d.key) })
+        .attr("stroke-width", 1.5)
+        .attr("stroke-opacity", 0.5)
+        .attr("d", function(d){
+          return d3.line()
+            .x(function(d) { return xScale(d.key); })
+            .y(function(d) { return yScale(+d.value.EDU_LEVEL_COUNT / yearly_people_count[d.key]); })
+            (d.values)
+        })
+
+    // Add one dot in the legend for each name.
+    var size = 5
+    svg.selectAll("mydots")
+      .data(res)
+      .enter()
+      .append("rect")
+        .attr("x", 500)
+        .attr("y", function(d,i){ return 20 + i*(size+5)}) // 100 is where the first dot appears. 25 is the distance between dots
+        .attr("width", size)
+        .attr("height", size)
+        .style("fill", function(d){ return color(d)})
+
+
+    // Add one dot in the legend for each name.
+    svg.selectAll("mylabels")
+      .data(res)
+      .enter()
+      .append("text")
+        .attr("x", 500 + size*1.2)
+        .attr("y", function(d,i){ return 20 + i*(size+5) + (size/2)}) // 100 is where the first dot appears. 25 is the distance between dots
+        .style("fill", function(d){ return color(d)})
+        .text(function(d){ return d})
+        .attr("text-anchor", "left")
+        .style("alignment-baseline", "middle")
+
+
+  });
+  
 
 </script>
 </body>
